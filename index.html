@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Cute Planner ✈️ NH924</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Axios CDN (API用) -->
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+  <!-- Tailwind 自訂主題色 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#97CBFF',
+          },
+          fontFamily: {
+            sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <style>
+    body {
+      background: linear-gradient(135deg, #f7fbff 0%, #e8f2ff 100%);
+      min-height: 100vh;
+    }
+    .phone-shell {
+      max-width: 420px;
+      border-radius: 2rem;
+      box-shadow:
+        0 25px 50px rgba(0,0,0,0.15),
+        0 0 0 1px rgba(151,203,255,0.3);
+      overflow: hidden;
+      background: white;
+    }
+    .soft-card {
+      border-radius: 1.25rem;
+      background: linear-gradient(135deg, #ffffff, #f8fbff);
+      box-shadow:
+        0 12px 30px rgba(151,203,255,0.4);
+      border: 1px solid rgba(151,203,255,0.15);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center px-4 py-8 font-sans">
+
+  <div id="app" class="phone-shell w-full">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-primary to-blue-400 text-white px-5 pt-5 pb-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs opacity-80">Today</p>
+          <h1 class="text-xl font-semibold tracking-wide">{{ todayLabel }}</h1>
+        </div>
+        <div class="flex items-center gap-2 text-xs bg-white/20 px-3 py-1.5 rounded-full backdrop-blur-sm">
+          <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+          <span>少女行程管家</span>
+        </div>
+      </div>
+      <div class="mt-3 flex gap-1 text-[11px]">
+        <span v-for="tab in tabs"
+              :key="tab.id"
+              @click="activeTab = tab.id"
+              class="px-3 py-1.5 rounded-full cursor-pointer transition-all backdrop-blur-sm"
+              :class="activeTab === tab.id
+                ? 'bg-white text-primary shadow-lg scale-105'
+                : 'text-white/80 hover:bg-white/20'">
+          {{ tab.label }}
+        </span>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <main class="px-4 pb-6 pt-3 space-y-4 text-[13px] text-slate-700">
+      
+      <!-- 航班資訊卡片 -->
+      <section class="soft-card p-4 mx-2">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-slate-800 flex items-center gap-1">
+            ✈️ 我的航班
+          </h2>
+          <span class="text-[11px] text-primary font-semibold">{{ daysToTrip }} 天後出發</span>
+        </div>
+        
+        <div class="space-y-3 mb-3">
+          <!-- 去程 -->
+          <div class="flex items-center justify-between group">
+            <div class="flex items-center gap-3 flex-1">
+              <div class="w-12 h-12 bg-gradient-to-r from-blue-400 to-primary rounded-xl flex items-center justify-center text-white font-semibold text-sm shadow-lg">
+                NH924
+              </div>
+              <div>
+                <p class="text-[14px] font-semibold text-slate-900">🛫 去程</p>
+                <p class="text-[11px] text-slate-500">12/24 香港 → 東京</p>
+              </div>
+            </div>
+            <div class="flex flex-col items-end gap-1 text-[11px]">
+              <span class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full font-medium text-xs">
+                {{ departureStatus }}
+              </span>
+              <span class="text-slate-500">{{ departureCountdown }}</span>
+            </div>
+          </div>
+          
+          <!-- 回程 -->
+          <div class="flex items-center justify-between pt-3 border-t border-primary/20">
+            <div class="flex items-center gap-3 flex-1">
+              <div class="w-12 h-12 bg-gradient-to-r from-rose-400 to-pink-400 rounded-xl flex items-center justify-center text-white font-semibold text-sm shadow-lg">
+                NH923
+              </div>
+              <div>
+                <p class="text-[14px] font-semibold text-slate-900">🛬 回程</p>
+                <p class="text-[11px] text-slate-500">1/1 東京 → 香港</p>
+              </div>
+            </div>
+            <div class="flex flex-col items-end gap-1 text-[11px]">
+              <span class="px-2 py-1 bg-amber-100 text-amber-700 rounded-full font-medium text-xs">
+                {{ returnStatus }}
+              </span>
+              <span class="text-slate-500">{{ returnCountdown }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 即時倒數 -->
+        <div class="bg-gradient-to-r from-primary/10 to-blue-50 p-3 rounded-xl border border-primary/20">
+          <div class="flex items-center justify-between text-[12px] font-mono">
+            <span>⏰ 出發倒數：</span>
+            <span class="text-lg font-bold text-primary">{{ tripCountdown }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 行程表 -->
+      <section v-if="activeTab === 'schedule'" class="soft-card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-slate-800">📅 行程表</h2>
+          <span class="text-[11px] text-primary">安排你的一天</span>
+        </div>
+        
+        <!-- 天氣 -->
+        <div class="mb-3 p-3 bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl border border-sky-200">
+          <p class="text-[12px] text-slate-600 flex items-center gap-2">
+            <span>🌤️</span>
+            <span v-if="weather.loaded">
+              {{ weather.city }}：{{ weather.temp }}°C {{ weather.desc }}
+            </span>
+            <span v-else class="animate-pulse">載入天氣中...</span>
+          </p>
+        </div>
+        
+        <div class="space-y-3 max-h-72 overflow-y-auto pr-1">
+          <div v-for="(item, idx) in schedule" :key="idx" class="flex gap-3 items-start">
+            <div class="flex flex-col items-center mt-0.5 flex-shrink-0">
+              <div class="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center text-primary text-[11px] font-semibold">
+                {{ item.time }}
+              </div>
+              <div class="w-px flex-1 bg-gradient-to-b from-primary/50 to-primary/20 mt-2"></div>
+            </div>
+            <div class="flex-1 bg-white/90 hover:bg-white rounded-xl px-4 py-3 border border-primary/15 hover:shadow-md transition-all">
+              <div class="flex items-center justify-between mb-1">
+                <p class="font-semibold text-[14px] text-slate-900">{{ item.title }}</p>
+                <button v-if="item.place" @click="openMaps(item.place)"
+                        class="text-[11px] text-primary font-medium underline underline-offset-2 hover:no-underline">
+                  🗺️ 導航
+                </button>
+              </div>
+              <p class="text-[12px] text-slate-500 mb-1" v-if="item.note">{{ item.note }}</p>
+              <p class="text-[11px] text-slate-600 flex items-center gap-1" v-if="item.place">
+                📍 {{ item.place }}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <form @submit.prevent="addSchedule" class="mt-4 space-y-2">
+          <div class="flex gap-2">
+            <input v-model="newSchedule.time" type="time"
+                   class="flex-1 rounded-xl border border-primary/40 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary/40" />
+            <input v-model="newSchedule.title" type="text" placeholder="新增行程"
+                   class="flex-2 rounded-xl border border-primary/40 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary/40" />
+          </div>
+          <input v-model="newSchedule.place" type="text" placeholder="地點／地址（用於導航）"
+                 class="w-full rounded-xl border border-primary/30 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary/40" />
+          <button type="submit" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-primary to-blue-500 text-white font-semibold text-[12px] shadow-lg hover:shadow-xl transition-all">
+            ✨ 新增行程
+          </button>
+        </form>
+      </section>
+
+      <!-- 記帳 -->
+      <section v-if="activeTab === 'budget'" class="soft-card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-slate-800">💰 記帳小本本</h2>
+          <span class="text-[12px] font-semibold text-primary">今日：HK$ {{ totalExpense }}</span>
+        </div>
+        
+        <div class="space-y-3 mb-4">
+          <div class="flex gap-2">
+            <input v-model="newExpense.title" type="text" placeholder="項目（晚餐/交通）"
+                   class="flex-[2] rounded-xl border border-primary/40 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary/40" />
+            <input v-model.number="newExpense.amount" type="number" min="0" step="0.1" placeholder="HKD"
+                   class="flex-[1] rounded-xl border border-primary/40 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary/40" />
+          </div>
+          <div class="flex items-center gap-2 text-[11px]">
+            <select v-model="newExpense.method" class="flex-1 rounded-xl border border-primary/40 px-3 py-2 text-[12px] bg-white focus:outline-none focus:ring-2 focus:ring-primary/40">
+              <option value="cash">💵 現金</option>
+              <option value="card">💳 信用卡</option>
+            </select>
+            <span class="text-emerald-600 font-semibold">
+              ≈ {{ convertedExpense }} {{ targetCurrency }}
+            </span>
+          </div>
+        </div>
+        
+        <div class="max-h-48 overflow-y-auto pr-1 space-y-2">
+          <div v-if="expenses.length === 0" class="text-center py-8 text-slate-400 text-[12px]">
+            還沒記帳，先加一筆吧～💙
+          </div>
+          <div v-for="(item, idx) in expenses" :key="idx"
+               class="flex items-center justify-between bg-white/90 hover:bg-white rounded-xl px-4 py-3 border border-primary/10 hover:border-primary/20 transition-all">
+            <div class="flex-1">
+              <p class="font-medium text-[13px] text-slate-900">{{ item.title }}</p>
+              <p class="text-[11px] text-slate-400">{{ item.date }}</p>
+            </div>
+            <div class="flex flex-col items-end gap-1 text-right">
+              <span class="text-lg font-bold text-primary">HK$ {{ item.amount }}</span>
+              <span class="text-[11px] text-emerald-600">≈ {{ item.converted }} {{ targetCurrency }}</span>
+              <span class="text-[11px] px-2 py-0.5 bg-gray-100 rounded-full text-xs">
+                {{ item.method === 'cash' ? '現金' : '信用卡' }}
+              </span>
+              <button @click="deleteExpense(idx)" class="text-slate-400 hover:text-rose-500 text-[14px] p-1 -m-1 rounded-full hover:bg-rose-50">
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 旅行購物清單 -->
+      <section v-if="activeTab === 'shopping'" class="soft-card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-slate-800">🛍️ 旅行購物清單</h2>
+          <span class="text-[11px] font-semibold text-primary">
+            {{ shoppingLeft }}/{{ shoppingList.length }} 件
+          </span>
+        </div>
+        
+        <!-- 新增表單 -->
+        <div class="space-y-2 mb-4 p-4 bg-gradient-to-br from-amber-50 to-pink-50 rounded-2xl border border-amber-200">
+          <input v-model="newItem.text" type="text" placeholder="物品（面膜/轉接頭/零食）"
+                 class="w-full rounded-xl border border-primary/40 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary/40" />
+          <div class="flex items-center gap-2">
+            <input v-model.number="newItem.estimatedPrice" type="number" min="0" step="0.1" placeholder="預估 HKD"
+                   class="flex-1 rounded-xl border border-primary/40 px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-primary/40" />
+            <label class="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer p-2 -m-2 hover:bg-white rounded-xl">
+              <input type="file" @change="onImageSelect" accept="image/*" class="hidden" ref="imageInput">
+              📸 加圖
+            </label>
+            <button @click="addItem" :disabled="!newItem.text.trim()"
+                    class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold text-[11px] shadow hover:shadow-lg disabled:opacity-50 transition-all">
+              ✨ 加入
+            </button>
+          </div>
+        </div>
+
+        <!-- 清單 -->
+        <div class="max-h-56 overflow-y-auto pr-1 space-y-2">
+          <div v-if="shoppingList.length === 0" class="text-center py-12 text-slate-400">
+            <div class="text-2xl mb-2">🛍️</div>
+            <p class="text-[12px]">開始規劃旅行購物清單吧～</p>
+          </div>
+          <div v-for="(item, idx) in sortedShoppingList" :key="idx"
+               class="group bg-white/90 hover:bg-white rounded-2xl p-4 border transition-all"
+               :class="item.bought ? 'border-emerald-200 bg-emerald-50/70 shadow-md' : 'border-amber-200 bg-amber-50/50 hover:shadow-lg'">
+            <div class="flex items-start gap-3">
+              <!-- 圖片 -->
+              <div class="w-16 h-16 rounded-xl overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 flex-shrink-0 mt-0.5 shadow-sm"
+                   :style="item.image ? `background-image: url(${item.image})` : ''"
+                   :class="item.image ? 'bg-cover bg-center shadow-md' : ''">
+                <div v-if="!item.image" class="w-full h-full flex items-center justify-center text-slate-400 text-sm">
+                  📷
+                </div>
+              </div>
+              
+              <!-- 內容 -->
+              <div class="flex-1 min-w-0">
+                <label class="flex items-start gap-2 cursor-pointer w-full">
+                  <input type="checkbox" v-model="item.bought" @change="updateItemBought(idx)"
+                         class="mt-1 h-5 w-5 rounded border-2 border-primary/60 text-primary focus:ring-primary/50 mt-0.5">
+                  <span class="text-[14px] font-semibold leading-tight flex-1 pr-2"
+                        :class="item.bought ? 'line-through text-slate-500' : 'text-slate-900'">
+                    {{ item.text }}
+                  </span>
+                </label>
+                
+                <!-- 價錢 -->
+                <div class="flex items-center gap-3 mt-2 text-[12px]">
+                  <span v-if="item.estimatedPrice" class="text-slate-400 line-through flex items-center gap-1">
+                    💭 預估：HK$ {{ item.estimatedPrice }}
+                  </span>
+                  <div v-if="item.bought" class="flex items-center gap-2">
+                    <span v-if="item.actualPrice" class="font-bold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full text-sm flex items-center gap-1">
+                      ✓ HK$ {{ item.actualPrice }}
+                    </span>
+                    <input v-else v-model.number="item.actualPrice" type="number" min="0" step="0.1" placeholder="實際價"
+                           class="w-20 rounded-lg border border-emerald/40 px-2 py-1 text-[11px] focus:outline-none focus:ring-2 focus:ring-emerald/40" />
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 刪除 -->
+              <button @click="deleteItem(idx)"
+                      class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-500 text-xl p-2 -m-2 rounded-full hover:bg-rose-100 transition-all">
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 統計 -->
+        <div class="mt-4 pt-4 border-t border-primary/20 space-y-1">
+          <div class="flex justify-between text-[12px] text-slate-600">
+            <span>💰 總預算：</span><span>HK$ {{ totalEstimated }}</span>
+          </div>
+          <div class="flex justify-between text-[12px] font-bold text-emerald-600">
+            <span>✅ 已花：</span><span>HK$ {{ totalActual }}</span>
+          </div>
+          <div class="flex justify-between text-[13px] font-bold" :class="remainingBudget >= 0 ? 'text-emerald-600' : 'text-rose-600'">
+            <span>💚 剩餘：</span><span>{{ remainingBudget }}</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const { createApp, computed, ref, onMounted } = Vue
+
+    createApp({
+      data() {
+        return {
+          activeTab: 'schedule',
+          tabs: [
+            { id: 'schedule', label: '行程表' },
+            { id: 'budget', label: '記帳' },
+            { id: 'shopping', label: '購物' }
+          ],
+          // 航班
+          flights: {
+            departure: { flight: 'NH924', date: new Date('2025-12-24T10:30:00+08:00') },
+            return: { flight: 'NH923', date: new Date('2026-01-01T16:30:00+08:00') }
+          },
+          // 行程
+          schedule: [
+            { time: '09:00', title: '起床 + 早餐', note: '慢慢開始美好的一天', place: '大埔' },
+            { time: '11:00', title: '咖啡 / Brunch', note: '跟朋友小聚', place: '銅鑼灣' },
+            { time: '15:00', title: '逛街購物', note: '買旅行用品', place: '尖沙咀' }
+          ],
+          newSchedule: { time: '18:00', title: '', place: '' },
+          // 天氣
+          weather: { loaded: false, city: '香港', temp: '--', desc: '' },
+          // 記帳
+          expenses: [],
+          newExpense: { title: '', amount: null, method: 'cash' },
+          targetCurrency: 'JPY',
+          rateHKDToTarget: 20,
+          // 購物
+          shoppingList: [],
+          newItem: { text: '', estimatedPrice: null, image: '' },
+          imageInput: null
+        }
+      },
+      
+      computed: {
+        todayLabel() {
+          const d = new Date()
+          return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}（週${['日','一','二','三','四','五','六'][d.getDay()]}）`
+        },
+        daysToTrip() {
+          const diff = Math.ceil((this.flights.departure.date - new Date()) / (1000*60*60*24))
+          return diff > 0 ? diff : 0
+        },
+        departureStatus() {
+          const diff = (this.flights.departure.date - new Date()) / (1000*60*60*1000)
+          return diff > 7*24 ? '準備中' : diff > 24 ? '即將出發' : '今天！'
+        },
+        returnStatus() {
+          return (this.flights.return.date - new Date()) > 0 ? '未回程' : '已結束'
+        },
+        departureCountdown() {
+          const diff = this.flights.departure.date - new Date()
+          if (diff < 0) return '已出發'
+          const d = Math.floor(diff / (1000*60*60*24))
+          const h = Math.floor((diff % (1000*60*60*24)) / (1000*60*60))
+          return d > 0 ? `${d}天${h}時` : `${h}小時`
+        },
+        returnCountdown() {
+          const diff = this.flights.return.date - new Date()
+          if (diff < 0) return '已回來'
+          return `${Math.floor(diff / (1000*60*60*24))}天後`
+        },
+        tripCountdown() {
+          const diff = this.flights.departure.date - new Date()
+          if (diff < 0) return '旅程中'
+          const d = Math.floor(diff / (1000*60*60*24))
+          const h = Math.floor((diff % (1000*60*60*24)) / (1000*60*60))
+          const m = Math.floor((diff % (1000*60*60)) / (1000*60))
+          return `${d}天 ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`
+        },
+        totalExpense() {
+          return this.expenses.reduce((s, e) => s + Number(e.amount||0), 0).toFixed(1)
+        },
+        convertedExpense() {
+          return this.newExpense.amount && this.rateHKDToTarget 
+            ? (this.newExpense.amount * this.rateHKDToTarget).toFixed(0) : '--'
+        },
+        sortedShoppingList() {
+          return [...this.shoppingList].sort((a,b) => (b.bought?1:0) - (a.bought?1:0))
+        },
+        shoppingLeft() {
+          return this.shoppingList.filter(i => !i.bought).length
+        },
+        totalEstimated() {
+          return this.shoppingList.reduce((s,i) => s + Number(i.estimatedPrice||0), 0).toFixed(1)
+        },
+        totalActual() {
+          return this.shoppingList.filter(i => i.bought && i.actualPrice)
+            .reduce((s,i) => s + Number(i.actualPrice), 0).toFixed(1)
+        },
+        remainingBudget() {
+          return (Number(this.totalEstimated) - Number(this.totalActual)).toFixed(1)
+        }
+      },
+      
+      methods: {
+        addSchedule() {
+          if (!this.newSchedule.title.trim()) return
+          this.schedule.push({
+            time: this.newSchedule.time || '--:--',
+            title: this.newSchedule.title.trim(),
+            note: '',
+            place: this.newSchedule.place.trim()
+          })
+          this.newSchedule = { time: '18:00', title: '', place: '' }
+        },
+        addExpense() {
+          if (!this.newExpense.title?.trim() || !this.newExpense.amount) return
+          const d = new Date()
+          this.expenses.unshift({
+            title: this.newExpense.title.trim(),
+            amount: Number(this.newExpense.amount),
+            date: `${d.getMonth()+1}/${d.getDate()}`,
+            method: this.newExpense.method,
+            converted: this.rateHKDToTarget ? (this.newExpense.amount * this.rateHKDToTarget).toFixed(0) : '--'
+          })
+          this.newExpense = { title: '', amount: null, method: 'cash' }
+        },
+        deleteExpense(i) { this.expenses.splice(i, 1) },
+        openMaps(place) {
+          if (!place) return
+          window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`, '_blank')
+        },
+        addItem() {
+          if (!this.newItem.text.trim()) return
+          this.shoppingList.unshift({
+            text: this.newItem.text.trim(),
+            estimatedPrice: Number(this.newItem.estimatedPrice) || null,
+            image: this.newItem.image || '',
+            bought: false,
+            actualPrice: null
+          })
+          this.newItem = { text: '', estimatedPrice: null, image: '' }
+          if (this.$refs.imageInput) this.$refs.imageInput.value = ''
+        },
+        deleteItem(i) { this.shoppingList.splice(i, 1) },
+        updateItemBought(i) {
+          // 已買但沒填價錢可後續填寫
+        },
+        onImageSelect(e) {
+          const file = e.target.files[0]
+          if (file?.type.startsWith('image/')) {
+            const reader = new FileReader()
+            reader.onload = (ev) => this.newItem.image = ev.target.result
+            reader.readAsDataURL(file)
+          }
+        },
+        async fetchRate() {
+          try {
+            const res = await axios.get(`https://api.exchangerate.host/latest?base=HKD&symbols=${this.targetCurrency}`)
+            this.rateHKDToTarget = res.data.rates[this.targetCurrency] || 20
+          } catch { this.rateHKDToTarget = 20 }
+        },
+        async fetchWeather() {
+          // 需要 OpenWeatherMap API Key 才能用，暫時用假資料
+          this.weather = {
+            loaded: true,
+            city: '香港',
+            temp: 22,
+            desc: '多雲轉晴'
+          }
+        }
+      },
+      
+      mounted() {
+        this.fetchRate()
+        setInterval(() => this.fetchRate(), 5*60*1000) // 5分鐘更新匯率
+        this.fetchWeather()
+      }
+    }).mount('#app')
+  </script>
+</body>
+</html>
